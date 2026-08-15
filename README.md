@@ -44,7 +44,7 @@ dsh plugin --profile <name> add https://github.com/FleetingEcho/dsh-handoff.git
 This records the dependency (as `github:FleetingEcho/dsh-handoff`) and activates the plugin. Verify it landed in the bundle list and composed into the config tree:
 
 ```bash
-dsh --profile <name> --dump-config | grep -A8 fortisoc/dsh-handoff
+dsh --profile <name> --dump-config | grep -A8 fleetingecho/dsh-handoff
 ```
 
 You should see an `id: handoff` entry with its default config. Then restart the profile and run `/handoff status`.
@@ -62,8 +62,8 @@ dsh plugin --profile <name> add /home/zteng/work/Tools/dsh-handoff
 ### Removing or updating
 
 ```bash
-dsh plugin --profile <name> remove @fortisoc/dsh-handoff     # remove
-dsh plugin --profile <name> update @fortisoc/dsh-handoff     # pull latest + reconcile
+dsh plugin --profile <name> remove @fleetingecho/dsh-handoff     # remove
+dsh plugin --profile <name> update @fleetingecho/dsh-handoff     # pull latest + reconcile
 ```
 
 ### Verifying it loaded
