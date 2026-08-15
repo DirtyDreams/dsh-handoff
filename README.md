@@ -15,8 +15,10 @@ The extension records recent turns, periodically folds them into concise Markdow
 You do **not** need to clone or build anything — the published repo ships a prebuilt `lib/index.js`, and `dsh plugin add` auto-activates it (the package declares a `dsh.bundle.patch`, so it is reconciled into the profile's bundle list automatically). One command:
 
 ```bash
-# Install into a profile (e.g. "web", the default GUI profile)
-dsh plugin --profile web add https://github.com/FleetingEcho/dsh-handoff.git
+# Install into a profile (e.g. "web", the default GUI profile). The short
+# `github:` shorthand and the full HTTPS URL are equivalent:
+dsh plugin --profile web add github:FleetingEcho/dsh-handoff
+# dsh plugin --profile web add https://github.com/FleetingEcho/dsh-handoff.git
 ```
 
 Then restart that profile (a running profile won't pick up a new layer until it reboots), open a session, and confirm:
@@ -37,11 +39,15 @@ dsh profiles are ordered stacks of plugin bundles under `$DSH_HOME/profiles/<nam
 
 ### Install from GitHub (recommended)
 
+`dsh plugin` is a thin pnpm forwarder, so it accepts any pnpm package specifier. The two forms below are equivalent for this plugin — `github:owner/repo` is the short pnpm shorthand for a GitHub repo, and the full HTTPS URL is the most explicit:
+
 ```bash
+dsh plugin --profile <name> add github:FleetingEcho/dsh-handoff
+# equivalent explicit form:
 dsh plugin --profile <name> add https://github.com/FleetingEcho/dsh-handoff.git
 ```
 
-This records the dependency (as `github:FleetingEcho/dsh-handoff`) and activates the plugin. Verify it landed in the bundle list and composed into the config tree:
+Either form records the dependency (as `github:FleetingEcho/dsh-handoff`) and activates the plugin. The same shorthand works for any git-hosted dsh plugin, e.g. `github:omdsh-dev/DSH-better-sidebar`; you can also pin a ref with `github:owner/repo#<branch|tag|commit>`. Verify it landed in the bundle list and composed into the config tree:
 
 ```bash
 dsh --profile <name> --dump-config | grep -A8 fleetingecho/dsh-handoff
