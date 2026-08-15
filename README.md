@@ -12,76 +12,70 @@ The extension records recent turns, periodically folds them into concise Markdow
 
 ## Quick start
 
-```bash
-# 1. Put the plugin somewhere dsh can find it (already at /home/zteng/work/Tools/dsh-handoff)
-cd /home/zteng/work/Tools/dsh-handoff
-
-# 2. Install the build toolchain (TypeScript is a devDependency; runtime deps are peer-only)
-npm install
-
-# 3. Build the bundle (bun build → lib/index.js, externals @deepseek-ai/*)
-npm run build
-
-# 4. Wire it into a dsh profile (see "Install into a profile" below)
-dsh plugin --profile <name> add /home/zteng/work/Tools/dsh-handoff
-```
-
-Then restart the profile and run `/handoff status` in a session to confirm it loaded.
-
----
-
-## Install into a profile
-
-dsh profiles are ordered stacks of plugin bundles under `$DSH_HOME/profiles/<name>/`. There are two supported ways to add this plugin.
-
-### Option A — let `dsh plugin` add it
+You do **not** need to clone or build anything — the published repo ships a prebuilt `lib/index.js`, and `dsh plugin add` auto-activates it (the package declares a `dsh.bundle.patch`, so it is reconciled into the profile's bundle list automatically). One command:
 
 ```bash
-dsh plugin --profile <name> add /home/zteng/work/Tools/dsh-handoff
+# Install into a profile (e.g. "web", the default GUI profile)
+dsh plugin --profile web add https://github.com/FleetingEcho/dsh-handoff.git
 ```
 
-This adds the path to the profile's `package.json` dependencies and runs pnpm in the profile directory. Because the runtime packages are optional peers, pnpm will **not** pull a second copy of the dsh runtime — dsh resolves them at load time from its own installation.
-
-### Option B — wire it manually
-
-Add the plugin to the profile's `package.json` and patch layer:
-
-```jsonc
-// $DSH_HOME/profiles/<name>/package.json
-{
-  "dependencies": {
-    "@fortisoc/dsh-handoff": "file:/home/zteng/work/Tools/dsh-handoff"
-  }
-}
-```
-
-```yaml
-# $DSH_HOME/profiles/<name>/cordis.patch.yml
-plugins:
-  '@fortisoc/dsh-handoff':
-    thresholdChars: 24000
-    thresholdTurns: 20
-    # model: "deepseek/deepseek-chat"   # optional: pin the summarizer model
-    # dir: "~/.agent/agent-handoff"       # optional: override the store root
-    # debug: false
-```
-
-Then, from the profile directory:
-
-```bash
-pnpm install
-dsh --profile <name>   # restart to load the plugin
-```
-
-### Verifying it loaded
-
-In any session under that profile, run:
+Then restart that profile (a running profile won't pick up a new layer until it reboots), open a session, and confirm:
 
 ```bash
 /handoff status
 ```
 
-You should see the store path, the detected branch, and `recording: yes`. If it prints "not initialized for this session", the plugin did not load — check the profile's plugin list with `dsh --profile <name> --dump-config`.
+You should see the store path (`~/.agent/agent-handoff/...`), the detected git branch, and `recording: yes`. Done — the rest of this README is reference.
+
+> First time using dsh? `$DSH_HOME` defaults to `~/.dsh`, and profiles live under `$DSH_HOME/profiles/<name>/`. Run `dsh --help` to list commands and `dsh plugin --profile <name> --help` for plugin-management flags.
+
+---
+
+## Install into a profile
+
+dsh profiles are ordered stacks of plugin bundles under `$DSH_HOME/profiles/<name>/`. This plugin is a self-activating bundle (it declares `dsh.bundle.patch` in `package.json`), so `dsh plugin add` does the whole job: it runs pnpm in the profile directory, copies the package in, and reconciles it into `dsh.profile.bundles`.
+
+### Install from GitHub (recommended)
+
+```bash
+dsh plugin --profile <name> add https://github.com/FleetingEcho/dsh-handoff.git
+```
+
+This records the dependency (as `github:FleetingEcho/dsh-handoff`) and activates the plugin. Verify it landed in the bundle list and composed into the config tree:
+
+```bash
+dsh --profile <name> --dump-config | grep -A8 fortisoc/dsh-handoff
+```
+
+You should see an `id: handoff` entry with its default config. Then restart the profile and run `/handoff status`.
+
+### Install from a local clone
+
+If you want to edit the source, install the local directory instead (it links rather than copies, so edits to `lib/index.js` are picked up on the next profile boot after a rebuild):
+
+```bash
+cd /home/zteng/work/Tools/dsh-handoff
+npm install && npm run build          # only needed if you change src/*
+dsh plugin --profile <name> add /home/zteng/work/Tools/dsh-handoff
+```
+
+### Removing or updating
+
+```bash
+dsh plugin --profile <name> remove @fortisoc/dsh-handoff     # remove
+dsh plugin --profile <name> update @fortisoc/dsh-handoff     # pull latest + reconcile
+```
+
+### Verifying it loaded
+
+In a session under that profile:
+
+```bash
+/handoff status
+```
+
+- Store path + detected branch + `recording: yes` → it loaded.
+- `handoff: not initialized for this session` → the plugin didn't load. Check `dsh --profile <name> --dump-config | grep -A8 fortisoc` for an `id: handoff` row; if it's absent, the bundle didn't activate (re-run the `add` command). If the row is present but the session reports an error, check the profile boot log — the most common load failure is a `Cannot find package '@deepseek-ai/...'` from installing as a bare `link:` to a directory outside the profile (use the GitHub/tarball form, or ensure the `@deepseek-ai/*` peers resolve from the profile's shared `node_modules`).
 
 ---
 
@@ -251,7 +245,7 @@ The branch document contains seven fixed sections: **Current Goal, Progress, Dec
 
 ## Configuration
 
-All options can be set in `cordis.patch.yml` (under the plugin key) **or** via environment variables. Env vars (with `PI_HANDOFF_*` aliases for parity) override config.
+All options can be overridden from the profile's `cordis.patch.yml` (a top-level YAML array of patch entries; target this plugin by `id: handoff`) **or** via environment variables. Env vars (with `PI_HANDOFF_*` aliases for parity) override config. The defaults ship in this plugin's own `cordis.patch.yml`, so you only need a profile patch to change something.
 
 | Field | Default | Env | Purpose |
 |---|---|---|---|
@@ -262,17 +256,27 @@ All options can be set in `cordis.patch.yml` (under the plugin key) **or** via e
 | `maxTokens` | 16384 | `HANDOFF_MAX_TOKENS` | Max output tokens for one summarizer call |
 | `debug` | false | `HANDOFF_DEBUG` / `PI_HANDOFF_DEBUG` | Log refresh/extraction diagnostics to stderr |
 
-### Choosing the summarizer model
+### Overriding config in a profile
 
-By default the summarizer reuses the session's active model (read from the session's request header, falling back to the agent's `provider`/`model` options). To pin a cheaper/faster model for background folds, set `model` in the patch layer or `HANDOFF_MODEL`:
+Edit `$DSH_HOME/profiles/<name>/cordis.patch.yml` (it starts as `[]`). A patch entry with `id: handoff` merges its `config` over the bundle's defaults (last write wins per field):
 
 ```yaml
-plugins:
-  '@fortisoc/dsh-handoff':
-    model: "deepseek/deepseek-chat"
+# $DSH_HOME/profiles/<name>/cordis.patch.yml
+- id: handoff
+  config:
+    model: "glm/GLM 5.2"     # use your configured glm provider for background folds
+    thresholdTurns: 15
+    # dir: "~/.agent/agent-handoff"   # optional: override the store root
+    # debug: true
 ```
 
-The value is `provider/model-id` exactly as dsh routes it. A model with no configured credentials is skipped and the session's active model is used instead.
+Confirm the composed value with `dsh --profile <name> --dump-config | grep -A10 'id: handoff'`, then restart the profile.
+
+### Choosing the summarizer model
+
+By default the summarizer reuses the session's active model (read from the session's request header, falling back to the agent's `provider`/`model` options). To pin a cheaper/faster model for background folds, set `model` in the patch layer (above) or `HANDOFF_MODEL`.
+
+The value is `provider/model-id` exactly as dsh routes it (e.g. `glm/GLM 5.2`, `deepseek/deepseek-chat`). A model with no configured credentials is skipped and the session's active model is used instead.
 
 ---
 
@@ -304,6 +308,8 @@ If you are coming from pi-handoff, here is how each piece translates. The store 
 
 ## Development
 
+End users never need to build — `lib/index.js` is committed so `dsh plugin add` works straight from the repo. Building is only for contributors changing `src/*`.
+
 ```bash
 cd /home/zteng/work/Tools/dsh-handoff
 npm install        # devDependencies for the build toolchain
@@ -331,3 +337,6 @@ Main files:
 | `src/summarizer.ts` | Branch refresh and project-knowledge extraction |
 | `src/injector.ts` | Branch and project context injection (runtime-context snapshot) |
 | `src/redact.ts` | Secret denylist |
+| `lib/index.js` | Prebuilt bundle (committed; externals `@deepseek-ai/*`) |
+| `package.json` | Declares `dsh.bundle.patch` → makes `dsh plugin add` auto-activate this package |
+| `cordis.patch.yml` | Bundle patch that self-inserts the plugin (`id: handoff`) with default config |
