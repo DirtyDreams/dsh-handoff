@@ -1,0 +1,17 @@
+# dsh-handoff bundle patch — inserts the @fortisoc/dsh-handoff Cordis plugin as a
+# profile layer. Declaring this file via package.json `dsh.bundle.patch` makes
+# `dsh plugin --profile <name> add @fortisoc/dsh-handoff` auto-activate the
+# plugin (it is reconciled into `dsh.profile.bundles` and this patch is composed
+# on boot). Override any field below from the profile's own cordis.patch.yml by
+# targeting id `handoff` (last write wins per row).
+
+- insert:
+    - id: handoff
+      name: '@fortisoc/dsh-handoff'
+      config:
+        dir: ''
+        model: ''
+        thresholdChars: 24000
+        thresholdTurns: 20
+        maxTokens: 16384
+        debug: false
