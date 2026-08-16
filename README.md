@@ -65,11 +65,20 @@ npm install && npm run build          # only needed if you change src/*
 dsh plugin --profile <name> add /home/zteng/work/Tools/dsh-handoff
 ```
 
-### Removing or updating
+### Updating an existing installation
 
 ```bash
-dsh plugin --profile <name> remove @fleetingecho/dsh-handoff     # remove
-dsh plugin --profile <name> update @fleetingecho/dsh-handoff     # pull latest + reconcile
+dsh plugin --profile web update @fleetingecho/dsh-handoff
+```
+
+This pulls the latest commit from GitHub and reconciles the profile's plugin
+tree. Restart the profile after updating, then run `/handoff status` in a
+session to verify the new version loaded.
+
+### Removing
+
+```bash
+dsh plugin --profile web remove @fleetingecho/dsh-handoff
 ```
 
 ### Verifying it loaded
@@ -81,7 +90,7 @@ In a session under that profile:
 ```
 
 - Store path + detected branch + `recording: yes` → it loaded.
-- `handoff: not initialized for this session` → the plugin didn't load. Check `dsh --profile <name> --dump-config | grep -A8 fortisoc` for an `id: handoff` row; if it's absent, the bundle didn't activate (re-run the `add` command). If the row is present but the session reports an error, check the profile boot log — the most common load failure is a `Cannot find package '@deepseek-ai/...'` from installing as a bare `link:` to a directory outside the profile (use the GitHub/tarball form, or ensure the `@deepseek-ai/*` peers resolve from the profile's shared `node_modules`).
+- `handoff: not initialized for this session` → the plugin didn't load. Check `dsh --profile <name> --dump-config | grep -A8 fleetingecho` for an `id: handoff` row; if it's absent, the bundle didn't activate (re-run the `add` command). If the row is present but the session reports an error, check the profile boot log — the most common load failure is a `Cannot find package '@deepseek-ai/...'` from installing as a bare `link:` to a directory outside the profile (use the GitHub/tarball form, or ensure the `@deepseek-ai/*` peers resolve from the profile's shared `node_modules`).
 
 ---
 
