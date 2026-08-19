@@ -42,7 +42,7 @@
  *           (PI_HANDOFF_* aliases are honored for parity with pi-handoff.)
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -144,7 +144,7 @@ export function resolveProjectRoot(cwd: string): string {
 	let root = gitRoot ?? cwd;
 	if (!gitRoot) {
 		try {
-			const top = execSync("git rev-parse --show-toplevel", {
+			const top = execFileSync("git", ["rev-parse", "--show-toplevel"], {
 				cwd,
 				stdio: ["ignore", "pipe", "ignore"],
 				encoding: "utf8",
@@ -162,19 +162,19 @@ export function resolveProjectRoot(cwd: string): string {
 /** Best-effort current git branch of `cwd`. Returns "default" when not in a repo
  * or on any error, and "detached-<short-sha>" for detached HEAD. */
 export function detectBranch(cwd: string, fallback = "default"): string {
-	const run = (args: string) =>
-		execSync(args, { cwd, stdio: ["ignore", "pipe", "ignore"], encoding: "utf8", timeout: 2000 }).trim();
+	const run = (args: string[]) =>
+		execFileSync("git", args, { cwd, stdio: ["ignore", "pipe", "ignore"], encoding: "utf8", timeout: 2000 }).trim();
 	try {
 		let ref = "";
 		try {
-			ref = run("git symbolic-ref -q HEAD");
+			ref = run(["symbolic-ref", "-q", "HEAD"]);
 		} catch {
 			// detached
 		}
 		if (ref.startsWith("refs/heads/")) return ref.slice("refs/heads/".length);
 		if (ref) return ref.replace(/^refs\//g, "");
 		try {
-			const sha = run("git rev-parse --short HEAD");
+			const sha = run(["rev-parse", "--short", "HEAD"]);
 			return sha ? `detached-${sha}` : fallback;
 		} catch {
 			return fallback;
@@ -187,7 +187,7 @@ export function detectBranch(cwd: string, fallback = "default"): string {
 /** Current local and remote branch names. Null means detection failed. */
 function activeGitBranches(cwd: string): Set<string> | null {
 	try {
-		const refs = execSync("git for-each-ref --format=%(refname) refs/heads refs/remotes", {
+		const refs = execFileSync("git", ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes"], {
 			cwd,
 			stdio: ["ignore", "pipe", "ignore"],
 			encoding: "utf8",
