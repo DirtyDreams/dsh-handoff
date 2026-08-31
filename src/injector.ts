@@ -19,6 +19,15 @@
 import { readFileSync, statSync } from "node:fs";
 import { HANDOFF_CAP_CHARS, PROJECT_KNOWLEDGE_CAP_CHARS, HandoffStore } from "./store";
 
+/**
+ * Handoff text is untrusted prompt data, not a prompt template.  Route it
+ * through a variable because DSH substitutes variable values without scanning
+ * them again for `{{...}}` references.  This preserves literal code snippets
+ * in handoff.md while keeping the context template itself valid.
+ */
+export const HANDOFF_CONTEXT_VARIABLE = "dsh_handoff_context";
+export const HANDOFF_CONTEXT_TEMPLATE = `{{${HANDOFF_CONTEXT_VARIABLE}}}`;
+
 interface CacheEntry {
 	mtimeMs: number;
 	size: number;

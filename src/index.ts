@@ -58,7 +58,7 @@ import { defineTool } from "@deepseek-ai/dsh-tools";
 import type { CommandRuntime } from "@deepseek-ai/dsh-commands";
 import type { SkillRegistry } from "@deepseek-ai/dsh-skill";
 import { Collector } from "./collector";
-import { Injector } from "./injector";
+import { HANDOFF_CONTEXT_TEMPLATE, HANDOFF_CONTEXT_VARIABLE, Injector } from "./injector";
 import { redact } from "./redact";
 import {
 	HandoffStore,
@@ -432,16 +432,17 @@ export function apply(ctx: Context, config: HandoffConfig) {
 	// One global runtime-context contribution; the framework evaluates it per
 	// assembly and passes the owning agent, so we route to that agent's frozen
 	// handoff snapshot. Subagents (no AgentHandoff) contribute nothing.
+	ctx.systemPrompt.variable(HANDOFF_CONTEXT_VARIABLE, (c: AssembleContext) => {
+		const agent = (c as AssembleContext & { agent?: Agent }).agent;
+		if (!agent) return "";
+		const h = agents.get(String(agent.id));
+		if (!h) return "";
+		return h.injector.getText();
+	});
 	ctx.systemPrompt.context({
 		name: "handoff",
 		order: -200,
-		text: (c: AssembleContext) => {
-			const agent = (c as AssembleContext & { agent?: Agent }).agent;
-			if (!agent) return "";
-			const h = agents.get(String(agent.id));
-			if (!h) return "";
-			return h.injector.getText();
-		},
+		text: HANDOFF_CONTEXT_TEMPLATE,
 	});
 
 	// ------------------------------------------------------------- lifecycle
