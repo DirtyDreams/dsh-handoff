@@ -1,6 +1,6 @@
 {
   "name": "@fleetingecho/dsh-handoff",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Self-maintaining handoff.md per working directory + git branch for DeepSeek Harness, stored under ~/.agent/agent-handoff (shared with pi-handoff).",
   "license": "MIT",
   "type": "module",

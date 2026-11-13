@@ -150,7 +150,11 @@ Only top-level agents adopt a store, collect, and inject. Subagents (delegation 
 
 ## Commands and tool
 
-### User commands (`/handoff …`)
+> The slash command is **`/handoff-memory`** by default, not `/handoff` — `dsh-session-handoff`
+> registers `/handoff` too, and dsh aborts the whole plugin on a duplicate command name. Change it
+> with config `command`, e.g. `command: handoff`. The agent tool is still `handoff` (no collision).
+
+### User commands (`/handoff-memory …`)
 
 | Command | Purpose |
 |---|---|

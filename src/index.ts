@@ -83,6 +83,10 @@ export const Config = z.object({
 	thresholdTurns: z.number().default(20).description("Auto-refresh every this many turns (0 = chars only). Env: HANDOFF_THRESHOLD_TURNS."),
 	maxTokens: z.number().default(16_384).description("Max output tokens for one summarizer call. Env: HANDOFF_MAX_TOKENS."),
 	debug: z.boolean().default(false).description("Log refresh/extraction diagnostics to stderr. Env: HANDOFF_DEBUG / PI_HANDOFF_DEBUG."),
+	command: z
+		.string()
+		.default("handoff-memory")
+		.description("Slash-command name to register. Defaults to handoff-memory so it cannot collide with another plugin's /handoff."),
 });
 
 /** Resolved plugin configuration (mirrors {@link Config}). */
@@ -93,6 +97,7 @@ interface HandoffConfig {
 	thresholdTurns: number;
 	maxTokens: number;
 	debug: boolean;
+	command: string;
 }
 
 /** Character ceiling: force an early refresh once this many new chars accumulate. */
@@ -100,6 +105,8 @@ let CHAR_THRESHOLD = 24_000;
 /** Turn backstop: auto-refresh every this many turns. 0 disables it (chars only). */
 let TURN_THRESHOLD = 20;
 let HANDOFF_MODEL = "";
+/** Registered slash-command name; kept distinct from dsh-session-handoff's /handoff. */
+let COMMAND_NAME = "handoff-memory";
 let MAX_TOKENS = 16_384;
 const REFRESH_TIMEOUT_MS = 120_000;
 /** Each handoff contributes at most 8k chars to extraction; five stay below the
@@ -425,6 +432,7 @@ export function apply(ctx: Context, config: HandoffConfig) {
 		const n = Number(process.env.HANDOFF_MAX_TOKENS ?? config.maxTokens);
 		return Number.isFinite(n) && n > 0 ? Math.floor(n) : 16_384;
 	})();
+	COMMAND_NAME = (config.command || "handoff-memory").trim().replace(/^\//, "") || "handoff-memory";
 	if (config.dir) process.env.HANDOFF_DIR = config.dir; // storeHome() reads this
 	llmRuntime = ctx.llm;
 
@@ -615,7 +623,7 @@ export function apply(ctx: Context, config: HandoffConfig) {
 	// ------------------------------------------------------------- command
 	ctx.inject(["commands"], (cmdCtx: Context) => {
 		cmdCtx.commands.register({
-			name: "handoff",
+			name: COMMAND_NAME,
 			description: "handoff: branch handoff + shared project knowledge (status|flush|project|pin|unpin|clear|pause|resume)",
 			handler: async (inv: { agent: Agent; rawInput: string; signal: AbortSignal }) => {
 				const h = agents.get(String(inv.agent.id));
