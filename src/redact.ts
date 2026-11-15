@@ -45,14 +45,22 @@ const PATTERNS: Array<[RegExp, string]> = [
 	[/\bBearer\s+[A-Za-z0-9._~+/=-]{20,}/g, "Bearer [REDACTED]"],
 	[/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, "[REDACTED-JWT]"],
 
-	// A named credential followed by its value: `aws_secret_access_key = …`,
-	// `API_KEY=…`, `password: "…"`. The value needs 8+ chars so a placeholder
-	// like `password: required` survives.
-	[/(\b[A-Za-z0-9_.\-]*(?:secret|token|passw(?:or)?d|api[_-]?key|private[_-]?key|access[_-]?key)[A-Za-z0-9_.\-]*\b\s*[=:]\s*["']?)[^\s"',]{8,}/gi, "$1[REDACTED]"],
+	// A credential assignment: `password: "hunter2hunter2"`, `api_key=Zx9K…`,
+	// `token: tajnehaslo123`. The value must be opaque — 8+ chars, at least one
+	// digit, and not a dotted path or dotted identifier — which is what separates
+	// a credential from ordinary source and docs (`maxTokens: ctx.maxTokens`,
+	// `tokens: docs/tokens.md`, `password: required`). Redacting those would
+	// silently destroy every handoff they appear in.
+	[/(\b[A-Za-z0-9_.\-]*(?:secret|token|passw(?:or)?d|api[_-]?key|private[_-]?key|access[_-]?key)[A-Za-z0-9_.\-]*\b\s*[=:]\s*["']?)(?![A-Za-z0-9_./\-]*\.[A-Za-z0-9])(?=[A-Za-z0-9_/+\-]*\d)[A-Za-z0-9_/+\-]{8,}/gi, "$1[REDACTED]"],
 
-	// The same credential named in prose, English and Polish. Separate from the
-	// assignment rule because the separator is a word, not `=`/`:`.
-	[/(\b(?:password|passwd|passphrase|secret|token|api[ -]?key|hasło|haslo|klucz)\s+(?:is|to|=|equals|jest)\s+)["']?[^\s"',.]{8,}/gi, "$1[REDACTED]"],
+	// Env-style names are unambiguous: an uppercase NAME ending in KEY/TOKEN/
+	// SECRET/PASSWORD assigned a value in a `.env` or shell line. No such name
+	// appears in ordinary prose, so the value needs no further shape test.
+	[/(\b[A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD)\s*=\s*["']?)[^\s"',]{8,}/g, "$1[REDACTED]"],
+
+	// The same credential named in prose, English and Polish: "the password is …",
+	// "hasło to …". The separator is a word, which is why it needs its own rule.
+	[/(\b(?:password|passwd|passphrase|secret|token|api[ -]?key|hasło|haslo|klucz)\s+(?:is|to|=|equals|jest)\s+)["']?(?=[A-Za-z0-9_\-]*\d)[A-Za-z0-9_\-]{8,}/gi, "$1[REDACTED]"],
 ];
 
 export function redact(text: string): string {

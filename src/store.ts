@@ -577,6 +577,18 @@ export class HandoffStore {
 				this.meta.branch = this.branch;
 				changed = true;
 			}
+			// The refresh counters are derived state, not fields in meta.json. Both
+			// initialize to 0 on a fresh store, so a process that resumes an
+			// existing one starts at 0 too — and because every CLI invocation is its
+			// own process, the turn counter could never reach the auto-refresh
+			// threshold across short-lived sessions. Rebuild them from the log.
+			const pending = this.readEventsSince(this.meta.lastRefreshedSeq)
+				.filter((event) => event.type === "turn_end");
+			this.turnsSinceRefresh = pending.length;
+			this.pendingChars = pending.reduce(
+				(total, event) => total + (event.excerpts ?? []).reduce((n, excerpt) => n + excerpt.text.length, 0),
+				0,
+			);
 			this.maybeTrimEvents();
 			this.saveMetaUnlocked(); // always rewrite normalized known fields only
 		});
