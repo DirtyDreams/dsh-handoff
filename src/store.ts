@@ -30,7 +30,7 @@
  */
 
 import { createHash, randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, readSync, realpathSync, renameSync, rmdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { redact } from "./redact";
@@ -661,6 +661,25 @@ export class HandoffStore {
 		return this.readSafe(this.handoffPath);
 	}
 
+	/** Whether events.jsonl ends on a line boundary, so an append cannot splice a truncated tail. */
+	private endsWithNewline(): boolean {
+		try {
+			const size = statSync(this.eventsPath).size;
+			if (size === 0) return true;
+			const fd = openSync(this.eventsPath, "r");
+			try {
+				const buf = Buffer.alloc(1);
+				readSync(fd, buf, 0, 1, size - 1);
+				return buf[0] === 0x0a;
+			} finally {
+				closeSync(fd);
+			}
+		} catch {
+			// Missing file: the write below creates it on a clean boundary.
+			return true;
+		}
+	}
+
 	private readSafe(path: string): string {
 		try {
 			return readFileSync(path, "utf8");
@@ -684,7 +703,12 @@ export class HandoffStore {
 				timestamp: new Date().toISOString(),
 				...ev,
 			};
-			appendFileSync(this.eventsPath, JSON.stringify(full) + "\n");
+			// A crash during a previous append leaves a line with no trailing
+			// newline. Appending straight onto it would splice the new event into
+			// the truncated one, and both would be lost — the reader skips the
+			// malformed line and the new event never becomes its own record.
+			const separator = this.endsWithNewline() ? "" : "\n";
+			appendFileSync(this.eventsPath, separator + JSON.stringify(full) + "\n");
 			this.meta.eventLineCount++;
 			if (full.type === "turn_end") {
 				this.meta.lastCollectedSeq = full.seq;
