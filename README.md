@@ -60,9 +60,9 @@ You should see an `id: handoff` entry with its default config. Then restart the 
 If you want to edit the source, install the local directory instead (it links rather than copies, so edits to `lib/index.js` are picked up on the next profile boot after a rebuild):
 
 ```bash
-cd /home/zteng/work/Tools/dsh-handoff
-npm install && npm run build          # only needed if you change src/*
-dsh plugin --profile <name> add /home/zteng/work/Tools/dsh-handoff
+cd <your-clone-of-this-repo>
+bun install && bun run build          # only needed if you change src/*
+dsh plugin --profile <name> add <your-clone-of-this-repo>
 ```
 
 ### Updating an existing installation
@@ -330,21 +330,51 @@ If you are coming from pi-handoff, here is how each piece translates. The store 
 End users never need to build — `lib/index.js` is committed so `dsh plugin add` works straight from the repo. Building is only for contributors changing `src/*`.
 
 ```bash
-cd /home/zteng/work/Tools/dsh-handoff
-npm install        # devDependencies for the build toolchain
-npm run build      # bun build → lib/index.js (externals @deepseek-ai/*)
-npm run typecheck  # tsc --noEmit (needs the @deepseek-ai/* type packages resolvable)
+cd <your-clone-of-this-repo>
+bun install        # devDependencies: typescript, @types/node
+bun run build      # bun build → lib/index.js (externals @deepseek-ai/*)
+bun run typecheck  # tsc --noEmit
+bun test           # unit tests
 ```
 
-For local type checking, make the `@deepseek-ai/*` type packages resolvable (e.g. symlink them from an installed dsh, or `npm install` them temporarily without saving):
+**`lib/index.js` must be rebuilt, never hand-edited.** A stale bundle still loads
+and still reports its config, so a hand-patched `lib` drifts from `src` silently:
+the `command` field was present in `src` for a full commit while the shipped
+bundle's schema rejected it, and `/handoff-test-cmd` simply never registered.
+The tests assert against the **built** file for exactly this reason.
+
+### Type checking and tests need the peer packages
+
+`tsc` and `bun test` resolve `@deepseek-ai/*` from `node_modules`, but those
+packages ship with dsh, not with this plugin. Point them at a dsh checkout:
 
 ```bash
 mkdir -p node_modules/@deepseek-ai
-for p in cordis dsh-agent dsh-commands dsh-llm dsh-session dsh-skill dsh-system-prompt dsh-tools schemastery; do
-  ln -s <path-to-dsh>/node_modules/@deepseek-ai/$p node_modules/@deepseek-ai/$p
-done
-npm run typecheck
+DSH=<path-to-deepseek-harness-checkout>
+ln -sfn "$DSH/vendor/cordis"                    node_modules/@deepseek-ai/cordis
+ln -sfn "$DSH/packages/core/agent"              node_modules/@deepseek-ai/dsh-agent
+ln -sfn "$DSH/packages/interaction/commands"    node_modules/@deepseek-ai/dsh-commands
+ln -sfn "$DSH/packages/llm/llm"                 node_modules/@deepseek-ai/dsh-llm
+ln -sfn "$DSH/packages/core/session"            node_modules/@deepseek-ai/dsh-session
+ln -sfn "$DSH/packages/skill/skill"             node_modules/@deepseek-ai/dsh-skill
+ln -sfn "$DSH/packages/core/system-prompt"      node_modules/@deepseek-ai/dsh-system-prompt
+ln -sfn "$DSH/packages/core/tools"              node_modules/@deepseek-ai/dsh-tools
+ln -sfn "$DSH/vendor/schemastery"               node_modules/@deepseek-ai/schemastery
 ```
+
+### Verifying memory end-to-end
+
+`verify-handoff.sh` proves a handoff survives a session boundary: it plants a
+marker the repository does not contain, then asks a **fresh** session for it.
+That is the only check that distinguishes injected context from a file read —
+a model that merely reads the repo answers correctly either way.
+
+```bash
+./verify-handoff.sh headless    # or: web
+```
+
+It also fails when tool output degrades to the `(no text output)` placeholder,
+which is what a collector reading the wrong content shape produces.
 
 Main files:
 
