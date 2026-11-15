@@ -51,7 +51,17 @@ dsh --permission-mode read-only "What does sample.py contain? One short sentence
 [ -f "$BRANCH_DIR/events.jsonl" ] || fail "plugin did not collect any events (no $BRANCH_DIR/events.jsonl)"
 ok "events collected: $(wc -l < "$BRANCH_DIR/events.jsonl") line(s)"
 
-# 3. Flush so handoff.md holds real content.
+# 3. Tool results must reach the store. A tool result is a whole message with
+# role "tool"; reading it as a phantom `tool-result` content block made every
+# output read as "(no text output)".
+if grep -q '"(no text output)"' "$BRANCH_DIR/events.jsonl"; then
+  fail "events.jsonl records tool output as '(no text output)' — the collector is reading the wrong shape"
+fi
+TOOL_LINES=$(grep -o '"role":"tool","text":"[^"]\{0,20\}' "$BRANCH_DIR/events.jsonl" | head -3 | wc -l)
+[ "$TOOL_LINES" -gt 0 ] || fail "no tool excerpts captured at all"
+ok "tool excerpts carry real content (not the '(no text output)' placeholder)"
+
+# 4. Flush so handoff.md holds real content.
 dsh --permission-mode read-only "/handoff-memory flush" >/dev/null 2>&1 || true
 [ -f "$BRANCH_DIR/handoff.md" ] || fail "no handoff.md after flush"
 SIZE_BEFORE=$(wc -c < "$BRANCH_DIR/handoff.md")
