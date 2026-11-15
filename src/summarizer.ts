@@ -10,6 +10,15 @@
  */
 
 import { BlockAssembler, createUserMessage, type ContentBlock, type GenerateOptions, type LlmRuntime } from "@deepseek-ai/dsh-llm";
+
+// DSH resolves message sources through a merge-extensible map with no shared
+// catch-all kind; a producer registers its own. Without this declaration the
+// source below is a type error and would be silently unsupported at runtime.
+declare module "@deepseek-ai/dsh-llm" {
+	interface MessageSourceMap {
+		"dsh-handoff": { kind: "dsh-handoff" };
+	}
+}
 import type { SessionId } from "@deepseek-ai/dsh-session";
 import { redact } from "./redact";
 import {
@@ -60,7 +69,7 @@ async function callLlm(ctx: ModelCtx, systemPrompt: string, userText: string, ti
 			system: systemPrompt,
 			messages: [createUserMessage({
 				content: [{ type: "text", text: userText }],
-				source: { kind: "plugin", plugin: "dsh-handoff" },
+				source: { kind: "dsh-handoff" },
 			})],
 			maxTokens: ctx.maxTokens,
 			sessionId: ctx.sessionId,

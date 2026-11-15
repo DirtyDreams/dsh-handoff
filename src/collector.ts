@@ -52,18 +52,16 @@ function textParts(content: unknown): string[] {
 	return out;
 }
 
-/** Pull the text out of a tool-result block's nested content. */
+/**
+ * Pull the text out of a tool result message. A tool result is a whole message
+ * with role "tool" whose content is a plain block list — `tool-result` is not a
+ * block type in this runtime, so searching for one yields every result as
+ * "(no text output)". The call id lives on the message, not inside a block.
+ */
 function toolResultText(message: unknown): string {
 	if (!message || typeof message !== "object") return "";
 	const content = (message as { content?: unknown }).content;
-	if (!Array.isArray(content)) return "";
-	for (const block of content) {
-		if (block && typeof block === "object" && (block as ContentBlock).type === "tool-result") {
-			const inner = (block as { content?: unknown }).content;
-			return textParts(inner).join("\n").trim();
-		}
-	}
-	return "";
+	return textParts(content).join("\n").trim();
 }
 
 /** One-line digest for an assistant tool-call content block. */
@@ -164,14 +162,8 @@ export class Collector {
 
 	private toolResultCallId(message: unknown): string | undefined {
 		if (!message || typeof message !== "object") return undefined;
-		const content = (message as { content?: unknown }).content;
-		if (!Array.isArray(content)) return undefined;
-		for (const block of content) {
-			if (block && typeof block === "object" && (block as ContentBlock).type === "tool-result") {
-				return (block as unknown as { toolCallId?: string }).toolCallId;
-			}
-		}
-		return undefined;
+		const id = (message as { toolCallId?: unknown }).toolCallId;
+		return typeof id === "string" ? id : undefined;
 	}
 
 	private resetTurn(turn: number): void {

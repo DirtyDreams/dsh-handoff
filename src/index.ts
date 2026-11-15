@@ -454,7 +454,7 @@ export function apply(ctx: Context, config: HandoffConfig) {
 	});
 
 	// ------------------------------------------------------------- lifecycle
-	ctx.on("agent/created", (payload: { agent: Agent; source: string }) => {
+	ctx.on("agent/created", (payload: { agent: Agent; source: string }): undefined => {
 		try {
 			const agent = payload.agent;
 			if (isSubagent(agent.session.header as { origin?: string; delegationDepth?: number })) return;
